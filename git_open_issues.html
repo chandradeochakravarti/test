@@ -1,0 +1,119 @@
+<html>
+    <head>
+        <title></title>
+        <script src="http://code.jquery.com/jquery-1.11.3.min.js"></script>
+        <style>
+            tr:nth-child(odd){
+              background-color: #cfd6d9;
+              border:1px solid;
+            }
+            th, td {
+                padding: 5px;
+                border: 1px solid black;
+            }
+            tr:nth-child(odd){
+              background-color: #cfd6d9;
+              border:1px solid;
+            }
+        </style>
+    </head>
+    <body>
+        <form>
+            <input type="text" name="url" id="url" placeholder="Full URL of GitHub repository" size="70">
+            <input type="button" name="submit" value="Submit" onclick="performGitOperation()">
+            <div id="result"></div>
+        </form>
+    </body>
+</html>
+
+<script type="text/javascript">
+    var asyc_count = 0;
+    var total_open_issues;
+    var open_issues_in_last24hr;
+    var open_issue_7daysago;
+    
+    function performGitOperation(){
+        // Input url eg: https://github.com/Shippable/support/issues
+        var input_url = document.getElementById('url').value;
+        //Break the input url in array format
+        var exploded_input_url =  input_url.split('/');
+
+        //Validate the input url
+        if(exploded_input_url[0] !== "https:" || exploded_input_url[1] !== "" || exploded_input_url[2] !== "github.com" || exploded_input_url[3] === "" || exploded_input_url[4] === ""){
+            alert("Invalid Url !!! Url should be in format https://github.com/{org_name or username}/{repo_name}/");
+            return;
+        }
+        document.getElementById('result').innerHTML = "<div>Result Loading...</div>";
+        //url for the github Api, exploded_input_url[3] contain organisation or username, exploded_input_url[4] contain repository name
+        var url = "https://api.github.com/repos/"+exploded_input_url[3]+"/"+exploded_input_url[4];
+        //call the function and receive the result from git api
+        performOperationOnGitAPI(url, function(error, response){
+            if(!error && response){
+                asyc_count ++;
+                //Get total no of open issues using the response array
+                total_open_issues = response["open_issues_count"];
+                displayResult();
+            }
+        });
+
+        //Date and Time 1 day or 24 hours ago in ISO 8601 Format
+        var open_issue_time_of_last24hr = new Date();
+            open_issue_time_of_last24hr.setDate(open_issue_time_of_last24hr.getDate()-1);
+        //url for the github Api with since parameter equal to time of last 24 hrs that return only issues updated at or after this time 
+        url = "https://api.github.com/repos/"+exploded_input_url[3]+"/"+exploded_input_url[4]+"/issues?since="+open_issue_time_of_last24hr;     
+        //call the function and receive the result from git api
+        performOperationOnGitAPI(url, function(error, response){
+            if(!error && response){
+                asyc_count ++;
+                //Get no of open issues that were opened in last 24 hours
+                open_issues_in_last24hr = response.length;
+                displayResult();
+            }
+        });
+
+        //Date and Time 1 day or 24 hours ago in ISO 8601 Format
+        var open_issue_time_7daysago = new Date()
+            open_issue_time_7daysago.setDate(open_issue_time_7daysago.getDate()-7);
+        //url for the github Api with since parameter equal to time of 7 days ago that return only issues updated at or after this time 
+        url = "https://api.github.com/repos/"+exploded_input_url[3]+"/"+exploded_input_url[4]+"/issues?since="+open_issue_time_7daysago;
+        //call the function and receive the result from git api
+        performOperationOnGitAPI(url, function(error, response){
+            if(!error && response){
+                asyc_count ++;
+                //Get no of open issues that were opened in 7 days ago
+                open_issue_7daysago = response.length;
+                displayResult();
+            }
+        });
+
+    }       
+
+    function performOperationOnGitAPI(url, cb){
+        var req = {
+            url: url,
+            method: 'GET',
+            headers: {
+                'accept' : 'application/vnd.github.v3+json',
+                'User-Agent': 'chandradeochakravarti'
+            },
+            dataType: 'JSON'
+        }
+
+        $.ajax(req)
+        .success(function(response){
+            cb(null, response);
+        })
+        .error(function(error){
+            cb(error);
+        });
+    }
+
+    function displayResult(){
+        if(asyc_count == 3){
+            document.getElementById('result').innerHTML += "<table><th>Open Issues</th><th>Count</th><tr><td>Total number of open issues : </td><td>" + total_open_issues + "</td></tr><tr><td>Number of open issues that were opened in the last 24 hours : </td><td>" + open_issues_in_last24hr + "</td></tr><tr><td>Number of open issues that were opened more than 24 hours ago but less than 7 days ago : </td><td>" + (open_issue_7daysago - open_issues_in_last24hr) + "</td></tr><tr><td>Number of open issues that were opened more than 7 days ago : </td><td>" + (total_open_issues - open_issue_7daysago) + "</td></tr></table>";
+            asyc_count = 0;
+        }
+        
+    }
+
+</script>
